@@ -3,6 +3,7 @@ import numpy as np
 from numpy.linalg import inv
 import math
 import matplotlib.pyplot as plt
+from sklearn import linear_model
 
 
 class Data(object):
@@ -105,10 +106,36 @@ def ridge_regression(data):
             beta_opm = beta_ridge
         beta_list.append(beta_ridge)
     beta_list = np.array(beta_list)
-    print("Find Optimal Lambda as {:.2f}".format(lambda_opm) + "Find minimum Mean Square Error as {:.2f}".format(MSE_min))
+    print("Find Optimal Lambda as {:.2f}".format(lambda_opm) + " Find minimum Mean Square Error as {:.2f}".format(MSE_min))
     prediction = np.dot(x_testing, beta_opm)
     MSE = np.sum(np.power((prediction - y_testing), 2)) / len(prediction)
     print("Mean Square Error on testing dataset is {:.2f}".format(MSE))
+    plt.figure(figsize=(10, 10))
+    for i in range(beta_list.shape[1]):
+        plt.plot(lambda_list.flatten(), beta_list[:,i].flatten(), "--o")
+    plt.show()
+
+
+def lasso_regression(data):
+    print("***********************PART 3***************************")
+    x_training, y_training = data.get_data_train(False)
+    x_testing, y_testing = data.get_data_test(False)
+    x_validation, y_validation = data.get_data_validation(False)
+    lambda_list = np.linspace(0, 0.8, 20)
+    beta_list = []
+    MSE_min = float('inf')
+    lambda_opm = 0
+    for lamb in lambda_list:
+        model = linear_model.Lasso(alpha=lamb)
+        model.fit(x_training, y_training)
+        prediction = model.predict(x_validation)
+        MSE = np.sum(np.power((prediction - y_validation), 2)) / len(prediction)
+        if MSE < MSE_min:
+            MSE_min = MSE
+            lambda_opm = lamb
+        beta_list.append(model.coef_)
+    beta_list = np.array(beta_list)
+    print("Find Optimal Lambda as {:.2f}".format(lambda_opm) + " Find minimum Mean Square Error as {:.2f}".format(MSE_min))
     plt.figure(figsize=(10, 10))
     for i in range(beta_list.shape[1]):
         plt.plot(lambda_list.flatten(), beta_list[:,i].flatten(), "--o")
@@ -137,6 +164,7 @@ def main():
     print("\n")
     linear_regression(data)
     ridge_regression(data)
+    lasso_regression(data)
 
 
 if __name__ == "__main__":
