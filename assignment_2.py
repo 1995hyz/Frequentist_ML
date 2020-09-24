@@ -87,10 +87,56 @@ def sgd_basic(feature, err, learning_rate, weight):
     return weight
 
 
-def sgd_training(feature, label, learning_rate, n_epoch):
+def sgd_training(feature, label, learning_rate, n_epoch, feature_val, label_val):
     theta = [0.0] * feature.shape[1]
     error_min = float('inf')
-    theta_optimal = theta
+    theta_optimal = np.copy(theta)
+    for n in range(n_epoch):
+        error_sum = 0
+        for i in range(feature.shape[0]):
+            prediction = label_prediction(theta, feature[i])
+            err = label[i] - prediction
+            # error_sum += err**2
+            theta[0] = sgd_basic(1, err, learning_rate, theta[0])
+            for j in range(feature.shape[1]-1):
+                theta[j+1] = sgd_basic(feature[i][j], err, learning_rate, theta[j+1])
+        # error_sum = get_validation_error(theta, feature_val, label_val)
+        error_sum = accuracy_test(theta, feature_val, label_val)
+        print(error_sum)
+        print(accuracy_test(theta, feature_val, label_val))
+        if error_sum < error_min:
+            error_min = error_sum
+            theta_optimal = np.copy(theta)
+        print('>epoch=%d, learning_rate=%.3f, error=%.3f' % (n+1, learning_rate, error_sum))
+    print(accuracy_test(theta_optimal, feature_val, label_val))
+    return theta_optimal
+
+
+def sgd_validation_L2(feature, label, learning_rate, n_epoch):
+    N = 100
+    lamb = np.logspace(-20, 1, N)
+    theta = np.zeros((N, feature.shape[1]))
+    error_sum = np.zeros((N, 1))
+
+    for n in range(n_epoch):
+        for i in range(feature.shape[0]):
+          for l in range(N):
+            prediction = label_prediction(theta[l, :], feature[i])
+            err = label[i] - prediction
+            error_sum[l] += err**2
+            theta[l, 0] = sgd_basic(1, err, learning_rate, theta[l, 0])
+            for j in range(feature.shape[1]-1):
+                theta[l, j+1] = sgd_basic(feature[i][j], err, learning_rate, theta[l, j+1])
+                theta[l, j+1] -= 2*lamb[l]*theta[l, j+1]
+    print("Errors in Validation: ", error_sum)
+    min = np.argmin(error_sum)
+    optimalLamb = lamb[min]
+    print("optimal Lambda: ", optimalLamb)
+    return optimalLamb
+
+
+def sgd_training_L2(feature, label, learning_rate, n_epoch, lamb):
+    theta = [0.0] * feature.shape[1]
     for n in range(n_epoch):
         error_sum = 0
         for i in range(feature.shape[0]):
@@ -100,13 +146,9 @@ def sgd_training(feature, label, learning_rate, n_epoch):
             theta[0] = sgd_basic(1, err, learning_rate, theta[0])
             for j in range(feature.shape[1]-1):
                 theta[j+1] = sgd_basic(feature[i][j], err, learning_rate, theta[j+1])
-        if error_sum < error_min:
-            error_min = error_sum
-            theta_optimal = theta
-        print('>epoch=%d, learning_rate=%.3f, error=%.3f' % (n, learning_rate, error_sum))
-    print("*************")
-    print(error_min)
-    return theta_optimal
+                theta[j+1] -= 2*lamb*theta[j+1]
+        print('>Training - epoch=%d, learning_rate=%.3f, error=%.3f' % (n, learning_rate, error_sum))
+    return theta
 
 
 def logistic_regression(data):
@@ -114,11 +156,14 @@ def logistic_regression(data):
     x_validation, y_validation = data.get_data_validation(True, "chd")
     x_test, y_test = data.get_data_test(True, "chd")
     learning_rate = 0.01
-    n_epoch = 10000
-    theta = sgd_training(x_train, y_train, learning_rate, n_epoch)
-    accuracy = accuracy_test(theta, x_validation, y_validation)
+    n_epoch = 5000
+    theta = sgd_training(x_train, y_train, learning_rate, n_epoch, x_validation, y_validation)
+    # accuracy = accuracy_test(theta, x_validation, y_validation)
+    accuracy = accuracy_test(theta, x_test, y_test)
+    print("*****")
     print(accuracy)
-    print(accuracy_test(theta, x_test, y_test))
+    #thetaL2 = sgd_training_L2(x_train, y_train, learning_rate, n_epoch,
+    #                          sgd_validation_L2(x_validation, y_validation, learning_rate, n_epoch))
 
 
 def sigmoid(num):
@@ -132,6 +177,15 @@ def accuracy_test(theta, x, y):
         if prediction[i] == y[i]:
             num_correct += 1
     return num_correct / len(prediction)
+
+
+def get_validation_error(theta, x, y):
+    error_sum = 0
+    for i in range(x.shape[0]):
+        prediction = label_prediction(theta, x[i])
+        err = y[i] - prediction
+        error_sum += err ** 2
+    return error_sum
 
 
 def main():
