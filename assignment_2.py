@@ -93,32 +93,17 @@ def sgd_basic(feature, err, learning_rate, weight):
     return weight
 
 
-def sgd_training(data, learning_rate, n_epoch, data_val):
+def sgd_training(data, learning_rate, n_epoch):
     theta = [0.0] * (data.shape[1] - 1)
-    error_min = float('inf')
-    theta_optimal = np.copy(theta)
-    feature_val = data_val[:, 0:-1]
-    label_val = data_val[:, -1]
+    feature = data[:, 0:-1]
+    label = data[:, -1]
     for n in range(n_epoch):
-        np.random.shuffle(data)
-        feature = data[:, 0:-1]
-        label = data[:, -1]
-        error_sum = 0
-        for i in range(feature.shape[0]):
-            prediction = label_prediction(theta, feature[i])
-            err = label[i] - prediction
-            error_sum += err**2
-            theta[0] = sgd_basic(1, err, learning_rate, theta[0])
-            for j in range(feature.shape[1]-1):
-                theta[j+1] = sgd_basic(feature[i][j], err, learning_rate, theta[j+1])
-        # error_sum = get_validation_error(theta, feature_val, label_val)
-        # error_sum = accuracy_test(theta, feature_val, label_val)
-        if error_sum < error_min:
-            error_min = error_sum
-            theta_optimal = np.copy(theta)
-        print('>epoch=%d, learning_rate=%.3f, error=%.3f' % (n+1, learning_rate, error_sum))
-    print(accuracy_test(theta_optimal, feature_val, label_val))
-    return theta_optimal
+        for j in range(feature.shape[1]):
+            index = random.randint(0, feature.shape[0]-1)
+            prediction = label_prediction(theta, feature[index])
+            err = label[index] - sigmoid(prediction)
+            theta = sgd_basic(feature[index], err, learning_rate, theta)
+    return theta
 
 
 def sgd_validation_L2(data, learning_rate, n_epoch):
@@ -170,14 +155,15 @@ def logistic_regression(data):
     data_train = data.get_data_train(True, "chd")
     data_validation = data.get_data_validation(True, "chd")
     data_test = data.get_data_test(True, "chd")
-    learning_rate = 0.1
-    n_epoch = 500
-    theta = sgd_training(data_train, learning_rate, n_epoch, data_validation)
+    learning_rate = 0.06
+    n_epoch = 1500
+    get_baseline(data_train, data_test)
+    theta = sgd_training(data_train, learning_rate, n_epoch)
     accuracy = accuracy_test(theta, data_test[:, 0:-1], data_test[:, -1])
-    print("*****")
+    print("Test Accuracy with unregularized sgd: ")
     print(accuracy)
-    #thetaL2 = sgd_training_L2(x_train, y_train, learning_rate, n_epoch,
-    #                          sgd_validation_L2(x_validation, y_validation, learning_rate, n_epoch))
+    thetaL2 = sgd_training_L2(data_train, learning_rate, n_epoch,
+                                sgd_validation_L2(data_validation, learning_rate, n_epoch))
 
 
 def sigmoid(num):
@@ -202,63 +188,18 @@ def get_validation_error(theta, x, y):
     return error_sum
 
 
-# Sigmoid function: g(z) = 1 / 1 + e^-z
-def sigmoid(z):
-    return 1 / (1 + np.exp(-z))
-
-
-# Logistic regression with no regularization to calculate theta
-def logistic_noreg(x_train, y_train, num_steps, learning_rate):
-    x_train = np.array(x_train)
-    y_train = np.array(y_train)
-    r, c = np.shape(x_train)
-    # Initialize theta to zeros
-    theta = np.zeros(c)
-
-    # Stochastic gradient descent over num_steps
-    for step in range(num_steps):
-        index_array = list(range(r))
-        j = 0
-        while j < r:
-            # Randomly select a single observation of x_train
-            random = int(np.random.uniform(0, index_array.__len__()))
-            x_row = x_train[index_array[random]]
-
-            # Use the sigmoid function to calculate h
-            z = np.dot(x_row, np.transpose(theta))
-            h = sigmoid(z)
-            # Calculate gradient and update theta
-            gradient = np.dot((y_train[index_array[random]] - h), x_row)
-            theta += learning_rate * gradient
-
-            # Ensure the same observation does not get selected again in this step
-            del (index_array[random])
-            j += 1
-
-    return theta
-
 def main():
     random.seed(datetime.now())
     df = load_dataset_1()
-    # seaborn.pairplot(df)
+    # scatter_plot = seaborn.pairplot(df, hue = "chd")
+    # scatter_plot.fig. suptitle("Scatterplot Matrix of the South African Heart Disease Data", y = 1)
     # plt.show()
     # Uncomment this line to randomize dataset.
-    # df = df.sample(frac=1, random_state=random.randint(0, 200)).reset_index().drop(labels=["index"], axis=1)
+    df = df.sample(frac=1, random_state=random.randint(0, 200)).reset_index().drop(labels=["index"], axis=1)
     data = Data(df)
     logistic_regression(data)
 
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
-    # main()
-    num_steps = 500
-    learning_rate = 0.05
-
-    # Calulate theta using train data
-    theta_noreg = logistic_noreg(x_train, y_train, num_steps, learning_rate)
-
-    # Calculate predictions on test data
-    z_test = np.dot(x_test, np.transpose(theta_noreg))
-    pred_noreg = np.round(sigmoid(z_test))
-    acc_noreg = (pred_noreg == y_test).sum().astype(np.float128) / len(pred_noreg)
-    print('Accuracy with no regularization: {0}'.format(acc_noreg))
+    main()
