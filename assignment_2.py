@@ -24,30 +24,36 @@ class Data(object):
     def get_data_train(self, add_prefix, target_label):
         length = int(0.8*len(self.df))
         data_training = Data.scaler(self.df[:length].drop(labels=[target_label], axis=1))
-        data_target = Data.scaler(self.df[target_label][:length])
+        # data_target = Data.scaler(self.df[target_label][:length])
+        data_target = self.df[target_label][:length]
+        data_training.insert(loc=data_training.shape[1], column=target_label, value=data_target)
         prefix = pd.DataFrame(data=np.full((length, 1), 1))
         if add_prefix:
             data_training.insert(loc=0, column="prefix", value=prefix)
-        return np.array(data_training), np.array(data_target)
+        return np.array(data_training)
 
     def get_data_test(self, add_prefix, target_label):
         length_min = int(0.8 * len(self.df))
         length_max = int(0.9 * len(self.df))
         data_testing = Data.scaler(self.df[length_min:length_max].drop(labels=[target_label], axis=1))
-        data_target = Data.scaler(self.df[target_label][length_min:length_max])
+        # data_target = Data.scaler(self.df[target_label][length_min:length_max])
+        data_target = self.df[target_label][length_min:length_max]
+        data_testing.insert(loc=data_testing.shape[1], column=target_label, value=data_target)
         prefix = np.ones((data_testing.shape[0], 1))
         if add_prefix:
             data_testing.insert(loc=0, column="prefix", value=prefix)
-        return np.array(data_testing), np.array(data_target)
+        return np.array(data_testing)
 
     def get_data_validation(self, add_prefix, target_label):
         length_min = int(0.9 * len(self.df))
         data_validation = Data.scaler(self.df[length_min:].drop(labels=[target_label], axis=1))
-        data_target = Data.scaler(self.df[target_label][length_min:])
+        # data_target = Data.scaler(self.df[target_label][length_min:])
+        data_target = self.df[target_label][length_min:]
+        data_validation.insert(loc=data_validation.shape[1], column=target_label, value=data_target)
         prefix = np.ones((data_validation.shape[0], 1))
         if add_prefix:
             data_validation.insert(loc=0, column="prefix", value=prefix)
-        return np.array(data_validation), np.array(data_target)
+        return np.array(data_validation)
 
     def get_correlation(self, label_a, label_b):
         """Given two labels, calculate the correlation between the two labelled columns."""
@@ -87,23 +93,26 @@ def sgd_basic(feature, err, learning_rate, weight):
     return weight
 
 
-def sgd_training(feature, label, learning_rate, n_epoch, feature_val, label_val):
-    theta = [0.0] * feature.shape[1]
+def sgd_training(data, learning_rate, n_epoch, data_val):
+    theta = [0.0] * (data.shape[1] - 1)
     error_min = float('inf')
     theta_optimal = np.copy(theta)
+    feature_val = data_val[:, 0:-1]
+    label_val = data_val[:, -1]
     for n in range(n_epoch):
+        np.random.shuffle(data)
+        feature = data[:, 0:-1]
+        label = data[:, -1]
         error_sum = 0
         for i in range(feature.shape[0]):
             prediction = label_prediction(theta, feature[i])
             err = label[i] - prediction
-            # error_sum += err**2
+            error_sum += err**2
             theta[0] = sgd_basic(1, err, learning_rate, theta[0])
             for j in range(feature.shape[1]-1):
                 theta[j+1] = sgd_basic(feature[i][j], err, learning_rate, theta[j+1])
         # error_sum = get_validation_error(theta, feature_val, label_val)
-        error_sum = accuracy_test(theta, feature_val, label_val)
-        print(error_sum)
-        print(accuracy_test(theta, feature_val, label_val))
+        # error_sum = accuracy_test(theta, feature_val, label_val)
         if error_sum < error_min:
             error_min = error_sum
             theta_optimal = np.copy(theta)
@@ -112,13 +121,16 @@ def sgd_training(feature, label, learning_rate, n_epoch, feature_val, label_val)
     return theta_optimal
 
 
-def sgd_validation_L2(feature, label, learning_rate, n_epoch):
+def sgd_validation_L2(data, learning_rate, n_epoch):
     N = 100
     lamb = np.logspace(-20, 1, N)
-    theta = np.zeros((N, feature.shape[1]))
+    theta = np.zeros((N, data.shape[1] - 1))
     error_sum = np.zeros((N, 1))
 
     for n in range(n_epoch):
+        np.random.shuffle(data)
+        feature = data[:, 0:-1]
+        label = data[:, -1]
         for i in range(feature.shape[0]):
           for l in range(N):
             prediction = label_prediction(theta[l, :], feature[i])
@@ -135,9 +147,12 @@ def sgd_validation_L2(feature, label, learning_rate, n_epoch):
     return optimalLamb
 
 
-def sgd_training_L2(feature, label, learning_rate, n_epoch, lamb):
-    theta = [0.0] * feature.shape[1]
+def sgd_training_L2(data, learning_rate, n_epoch, lamb):
+    theta = [0.0] * (data.shape[1] - 1)
     for n in range(n_epoch):
+        np.random.shuffle(data)
+        feature = data[:, 0:-1]
+        label = data[:, -1]
         error_sum = 0
         for i in range(feature.shape[0]):
             prediction = label_prediction(theta, feature[i])
@@ -152,14 +167,13 @@ def sgd_training_L2(feature, label, learning_rate, n_epoch, lamb):
 
 
 def logistic_regression(data):
-    x_train, y_train = data.get_data_train(True, "chd")
-    x_validation, y_validation = data.get_data_validation(True, "chd")
-    x_test, y_test = data.get_data_test(True, "chd")
-    learning_rate = 0.01
-    n_epoch = 5000
-    theta = sgd_training(x_train, y_train, learning_rate, n_epoch, x_validation, y_validation)
-    # accuracy = accuracy_test(theta, x_validation, y_validation)
-    accuracy = accuracy_test(theta, x_test, y_test)
+    data_train = data.get_data_train(True, "chd")
+    data_validation = data.get_data_validation(True, "chd")
+    data_test = data.get_data_test(True, "chd")
+    learning_rate = 0.1
+    n_epoch = 500
+    theta = sgd_training(data_train, learning_rate, n_epoch, data_validation)
+    accuracy = accuracy_test(theta, data_test[:, 0:-1], data_test[:, -1])
     print("*****")
     print(accuracy)
     #thetaL2 = sgd_training_L2(x_train, y_train, learning_rate, n_epoch,
@@ -188,6 +202,41 @@ def get_validation_error(theta, x, y):
     return error_sum
 
 
+# Sigmoid function: g(z) = 1 / 1 + e^-z
+def sigmoid(z):
+    return 1 / (1 + np.exp(-z))
+
+
+# Logistic regression with no regularization to calculate theta
+def logistic_noreg(x_train, y_train, num_steps, learning_rate):
+    x_train = np.array(x_train)
+    y_train = np.array(y_train)
+    r, c = np.shape(x_train)
+    # Initialize theta to zeros
+    theta = np.zeros(c)
+
+    # Stochastic gradient descent over num_steps
+    for step in range(num_steps):
+        index_array = list(range(r))
+        j = 0
+        while j < r:
+            # Randomly select a single observation of x_train
+            random = int(np.random.uniform(0, index_array.__len__()))
+            x_row = x_train[index_array[random]]
+
+            # Use the sigmoid function to calculate h
+            z = np.dot(x_row, np.transpose(theta))
+            h = sigmoid(z)
+            # Calculate gradient and update theta
+            gradient = np.dot((y_train[index_array[random]] - h), x_row)
+            theta += learning_rate * gradient
+
+            # Ensure the same observation does not get selected again in this step
+            del (index_array[random])
+            j += 1
+
+    return theta
+
 def main():
     random.seed(datetime.now())
     df = load_dataset_1()
@@ -201,4 +250,15 @@ def main():
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
-    main()
+    # main()
+    num_steps = 500
+    learning_rate = 0.05
+
+    # Calulate theta using train data
+    theta_noreg = logistic_noreg(x_train, y_train, num_steps, learning_rate)
+
+    # Calculate predictions on test data
+    z_test = np.dot(x_test, np.transpose(theta_noreg))
+    pred_noreg = np.round(sigmoid(z_test))
+    acc_noreg = (pred_noreg == y_test).sum().astype(np.float128) / len(pred_noreg)
+    print('Accuracy with no regularization: {0}'.format(acc_noreg))
