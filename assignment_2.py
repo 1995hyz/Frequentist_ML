@@ -158,12 +158,23 @@ def logistic_regression(data):
     learning_rate = 0.06
     n_epoch = 1500
     get_baseline(data_train, data_test)
-    theta = sgd_training(data_train, learning_rate, n_epoch)
-    accuracy = accuracy_test(theta, data_test[:, 0:-1], data_test[:, -1])
-    print("Test Accuracy with unregularized sgd: ")
+    # theta = sgd_training(data_train, learning_rate, n_epoch)
+    # accuracy = accuracy_test(theta, data_test[:, 0:-1], data_test[:, -1])
+    # print("Test Accuracy with unregularized sgd: ")
+    # print(accuracy)
+    # thetaL2 = sgd_training_L2(data_train, learning_rate, n_epoch,
+    #                             sgd_validation_L2(data_validation, learning_rate, n_epoch))
+    data_train = data.get_data_train(False, "chd")
+    data_validation = data.get_data_validation(False, "chd")
+    feature_header = list(data.column_name)
+    feature_header.remove("chd")
+    feature_header.append("chd")    # To make sure the label is at the end of the header list
+    theta, feature_selected = sgd_stepwise(data_train, feature_header, learning_rate, n_epoch, data_validation)
+    print(feature_selected)
+    feature_unselected = pd.DataFrame(data=data_test[:, 0:-1], columns=(["prefix"]+feature_header[0:-1]))
+    print(theta)
+    accuracy = accuracy_test(theta, np.array(feature_unselected[feature_selected]), data_test[:, -1])
     print(accuracy)
-    thetaL2 = sgd_training_L2(data_train, learning_rate, n_epoch,
-                                sgd_validation_L2(data_validation, learning_rate, n_epoch))
 
 
 def sigmoid(num):
@@ -186,6 +197,45 @@ def get_validation_error(theta, x, y):
         err = y[i] - prediction
         error_sum += err ** 2
     return error_sum
+
+
+def sgd_stepwise(data, data_header, learning_rate, n_epoch, data_val):
+    feature = data[:, 0:-1]
+    label = data[:, -1]
+    feature_unselected = pd.DataFrame(data=feature, columns=data_header[0:-1])
+    feature_unselected_header = list(feature_unselected.columns)
+    feature_selected = pd.DataFrame(data=np.array([[1.0] * data.shape[0]]).T, columns=["prefix"])
+    data_val_frame = pd.DataFrame(data=data_val, columns=data_header)
+    feature_selected_val = pd.DataFrame(data=np.array(np.array([[1.0] * data_val.shape[0]]).T), columns=["prefix"])
+    theta_opt = []
+    accuracy_opt = 0
+    while True:
+        accuracy_opt_per_feature = 0
+        theta_opt_per_feature = []
+        feature_selected_candidate = feature_unselected_header[0]
+        for header in feature_unselected_header:
+            data_train = feature_selected.copy()
+            data_train.insert(len(data_train.columns), header, feature_unselected[header], True)
+            data_train.insert(len(data_train.columns), "label", label, True)
+            theta = sgd_training(np.array(data_train), learning_rate, n_epoch)
+            data_validation = feature_selected_val.copy()
+            data_validation.insert(len(data_validation.columns), header, data_val_frame[header], True)
+            data_validation.insert(len(data_validation.columns), "label", data_val[:, -1], True)
+            accuracy = accuracy_test(theta, np.array(data_validation)[:, 0:-1], np.array(data_validation)[:, -1])
+            if accuracy > accuracy_opt_per_feature:
+                accuracy_opt_per_feature = accuracy
+                feature_selected_candidate = header
+                theta_opt_per_feature = theta
+        if accuracy_opt_per_feature > accuracy_opt:
+            accuracy_opt = accuracy_opt_per_feature
+            theta_opt = theta_opt_per_feature
+            feature_selected.insert(len(feature_selected.columns), feature_selected_candidate, feature_unselected[feature_selected_candidate], True)
+            feature_selected_val.insert(len(feature_selected_val.columns), feature_selected_candidate, data_val_frame[feature_selected_candidate], True)
+            del feature_unselected[feature_selected_candidate]
+            feature_unselected_header.remove(feature_selected_candidate)
+        else:
+            break
+    return theta_opt, feature_selected.columns
 
 
 def main():
