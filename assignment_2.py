@@ -82,6 +82,19 @@ def load_dataset_1():
     return df
 
 
+def load_dataset_2():
+    url = "https://archive.ics.uci.edu/ml/machine-learning-databases/iris/iris.data"
+    df = pd.read_csv(url, header=None, names=[
+        "sepal_length",
+        "sepal_width",
+        "petal_length",
+        "petal_width",
+        "species"
+    ])
+    df['species'] = df['species'].astype('category').cat.codes
+    return df
+
+
 def label_prediction(theta, x):
     h = 1 / (1 + np.exp(-np.dot(np.transpose(theta), x)))
     return h
@@ -101,7 +114,7 @@ def sgd_training(data, learning_rate, n_epoch):
         for j in range(feature.shape[1]):
             index = random.randint(0, feature.shape[0]-1)
             prediction = label_prediction(theta, feature[index])
-            err = label[index] - sigmoid(prediction)
+            err = label[index] - int(round(sigmoid(prediction)))
             theta = sgd_basic(feature[index], err, learning_rate, theta)
     return theta
 
@@ -164,25 +177,25 @@ def logistic_regression(data):
     # print(accuracy)
     # thetaL2 = sgd_training_L2(data_train, learning_rate, n_epoch,
     #                             sgd_validation_L2(data_validation, learning_rate, n_epoch))
-    data_train = data.get_data_train(False, "chd")
-    data_validation = data.get_data_validation(False, "chd")
-    feature_header = list(data.column_name)
-    feature_header.remove("chd")
-    feature_header.append("chd")    # To make sure the label is at the end of the header list
-    theta, feature_selected = sgd_stepwise(data_train, feature_header, learning_rate, n_epoch, data_validation)
-    print(feature_selected)
-    feature_unselected = pd.DataFrame(data=data_test[:, 0:-1], columns=(["prefix"]+feature_header[0:-1]))
-    print(theta)
-    accuracy = accuracy_test(theta, np.array(feature_unselected[feature_selected]), data_test[:, -1])
-    print(accuracy)
+    # data_train = data.get_data_train(False, "chd")
+    # data_validation = data.get_data_validation(False, "chd")
+    # feature_header = list(data.column_name)
+    # feature_header.remove("chd")
+    # feature_header.append("chd")    # To make sure the label is at the end of the header list
+    # theta, feature_selected = sgd_stepwise(data_train, feature_header, learning_rate, n_epoch, data_validation)
+    # print(feature_selected)
+    # feature_unselected = pd.DataFrame(data=data_test[:, 0:-1], columns=(["prefix"]+feature_header[0:-1]))
+    # print(theta)
+    # accuracy = accuracy_test(theta, np.array(feature_unselected[feature_selected]), data_test[:, -1])
+    # print(accuracy)
 
 
 def sigmoid(num):
-    return int(round(1 / (1 + math.exp(-num))))
+    return 1 / (1 + math.exp(-num))
 
 
 def accuracy_test(theta, x, y):
-    prediction = [sigmoid(label_prediction(theta, row)) for row in x]
+    prediction = [int(round(sigmoid(label_prediction(theta, row)))) for row in x]
     num_correct = 0
     for i in range(len(prediction)):
         if prediction[i] == y[i]:
@@ -238,6 +251,29 @@ def sgd_stepwise(data, data_header, learning_rate, n_epoch, data_val):
     return theta_opt, feature_selected.columns
 
 
+def sgd_multivariable(data, learning_rate, n_epoch):
+    theta_list = []
+    feature = data[:, 0:-1]
+    label = data[:, -1]
+    classes = np.unique(label)
+    for single_class in classes:
+        label_training = np.array([np.where(label == single_class, 1, 0)]).T
+        data_training = np.append(feature, label_training, axis=1)
+        theta = sgd_training(data_training, learning_rate, n_epoch)
+        theta_list.append(theta)
+    return theta_list
+
+
+def label_prediction_multivariable(data, thetas):
+    feature = data[:, 0:-1]
+    label = data[:, -1]
+    prediction_list = []
+    for i in range(feature.shape[0]):
+      prediction = np.argmax([sigmoid(np.dot(feature[i], np.transpose(theta))) for theta in thetas])
+      prediction_list.append(prediction)
+    return np.array(prediction_list == label).mean()
+
+
 def main():
     random.seed(datetime.now())
     df = load_dataset_1()
@@ -248,6 +284,14 @@ def main():
     df = df.sample(frac=1, random_state=random.randint(0, 200)).reset_index().drop(labels=["index"], axis=1)
     data = Data(df)
     logistic_regression(data)
+
+    df2 = load_dataset_2()
+    df2 = df2.sample(frac=1, random_state=random.randint(0, 200)).reset_index()
+    data2 = Data(df2)
+    data_train = data2.get_data_train(True, "species")
+    data_test = data2.get_data_test(True, "species")
+    theta_list = sgd_multivariable(data_train, learning_rate=0.06, n_epoch=1500)
+    accuracy = label_prediction_multivariable(data_test, theta_list)
 
 
 if __name__ == "__main__":
