@@ -177,17 +177,17 @@ def logistic_regression(data):
     # print(accuracy)
     # thetaL2 = sgd_training_L2(data_train, learning_rate, n_epoch,
     #                             sgd_validation_L2(data_validation, learning_rate, n_epoch))
-    # data_train = data.get_data_train(False, "chd")
-    # data_validation = data.get_data_validation(False, "chd")
-    # feature_header = list(data.column_name)
-    # feature_header.remove("chd")
-    # feature_header.append("chd")    # To make sure the label is at the end of the header list
-    # theta, feature_selected = sgd_stepwise(data_train, feature_header, learning_rate, n_epoch, data_validation)
-    # print(feature_selected)
-    # feature_unselected = pd.DataFrame(data=data_test[:, 0:-1], columns=(["prefix"]+feature_header[0:-1]))
-    # print(theta)
-    # accuracy = accuracy_test(theta, np.array(feature_unselected[feature_selected]), data_test[:, -1])
-    # print(accuracy)
+    data_train = data.get_data_train(False, "chd")
+    data_validation = data.get_data_validation(False, "chd")
+    feature_header = list(data.column_name)
+    feature_header.remove("chd")
+    feature_header.append("chd")    # To make sure the label is at the end of the header list
+    theta, feature_selected = sgd_stepwise(data_train, feature_header, learning_rate, n_epoch, data_validation)
+    print(feature_selected)
+    feature_unselected = pd.DataFrame(data=data_test[:, 0:-1], columns=(["prefix"]+feature_header[0:-1]))
+    print(theta)
+    accuracy = accuracy_test(theta, np.array(feature_unselected[feature_selected]), data_test[:, -1])
+    print(accuracy)
 
 
 def sigmoid(num):
@@ -285,13 +285,13 @@ def main():
     data = Data(df)
     logistic_regression(data)
 
-    df2 = load_dataset_2()
-    df2 = df2.sample(frac=1, random_state=random.randint(0, 200)).reset_index()
-    data2 = Data(df2)
-    data_train = data2.get_data_train(True, "species")
-    data_test = data2.get_data_test(True, "species")
-    theta_list = sgd_multivariable(data_train, learning_rate=0.06, n_epoch=1500)
-    accuracy = label_prediction_multivariable(data_test, theta_list)
+    # df2 = load_dataset_2()
+    # df2 = df2.sample(frac=1, random_state=random.randint(0, 200)).reset_index()
+    # data2 = Data(df2)
+    # data_train = data2.get_data_train(True, "species")
+    # data_test = data2.get_data_test(True, "species")
+    # theta_list = sgd_multivariable(data_train, learning_rate=0.06, n_epoch=1500)
+    # accuracy = label_prediction_multivariable(data_test, theta_list)
 
 
 if __name__ == "__main__":
