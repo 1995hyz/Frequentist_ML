@@ -294,6 +294,39 @@ def main():
     # accuracy = label_prediction_multivariable(data_test, theta_list)
 
 
-if __name__ == "__main__":
-    warnings.filterwarnings("ignore")
-    main()
+# if __name__ == "__main__":
+#     warnings.filterwarnings("ignore")
+#     main()
+
+
+def load_dataset_3():
+    url = "https://raw.githubusercontent.com/1995hyz/Frequentist_ML/master/column_2C_weka.csv"
+    df = pd.read_csv(url, sep=",")
+    df['class'] = df['class'].astype('category').cat.codes
+    return df
+
+df = load_dataset_3()
+print("")
+
+# Uncomment this line to randomize dataset.
+df = df.sample(frac=1, random_state=random.randint(0, 200)).reset_index().drop(labels=["index"], axis=1)
+data = Data(df)
+data_train = data.get_data_train(True, "class")
+data_validation = data.get_data_validation(True, "class")
+data_test = data.get_data_test(True, "class")
+learning_rate = 0.05
+n_epoch = 1500
+baselineAccuracy = get_baseline(data_train, data_test)
+theta = sgd_training(data_train, learning_rate, n_epoch)
+accuracy = accuracy_test(theta, data_test[:, 0:-1], data_test[:, -1])
+print("Test Accuracy with unregularized sgd: ", accuracy)
+accuracyL2, thetaL2 = sgd_validation_L2(data_train, data_validation,learning_rate, n_epoch)
+accuracyL1, lasso = logistic_regression_L1(data_train, data_validation, learning_rate, n_epoch)
+accuracyStep = logistic_regression_foward_step(data)
+print("Forward-step regression: ", accuracyStep)
+approach = ['Baseline', 'Unregularized', 'with L2 penalty', 'with L1 pentalty', 'Forward Stepwise']
+correctness = [baselineAccuracy, accuracy, accuracyL2, accuracyL1,accuracyStep]
+tableCorrectness = pd.DataFrame(correctness,approach)
+print('% correctness for different approach of logistic regression')
+display(tableCorrectness)
+#Create a table for all the % of correctness
